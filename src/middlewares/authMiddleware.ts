@@ -1,36 +1,54 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { AuthRequest } from '../../types';
+import { AuthRequest, UserJwtPayload } from "../../types"
+import { UnauthorizedError, ForbiddenError } from '../utils/errors';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
-
-    const authHeader = req.get('Authorization');
-
-    if (!authHeader) {
-        console.log('No authorization header found');
-        return res.status(401).json({ message: 'Token not provided' });
-    }
-
-    const [bearer, token] = authHeader.split(' ');
-
-    if (!token) {
-        console.log('Token is missing after split');
-        return res.status(401).json({ message: 'Token format invalid' });
-    }
-
+export const authMiddleware = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+) => {
     try {
-        const decoded = jwt.verify(token, JWT_SECRET!) as { id: string; email: string; role: string };
+        const authHeader = req.headers['authorization'];
 
-        req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            throw new UnauthorizedError('Token not provided');
+        }
+
+        const token = authHeader.split(' ')[1];
+
+        if (!token) {
+            throw new UnauthorizedError('Token format invalid');
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as UserJwtPayload;
+
+        if (!decoded.id || !decoded.email || !decoded.role) {
+            throw new UnauthorizedError('Invalid token payload');
+        }
+
+        req.user = {
+            id: decoded.id,
+            email: decoded.email,
+            role: decoded.role
+        };
+
         next();
     } catch (error) {
-        console.error('Token verification error:', error);
-        console.error('Error type:', error instanceof jwt.JsonWebTokenError ? 'JsonWebTokenError' : typeof error);
         if (error instanceof jwt.JsonWebTokenError) {
-            console.error('JWT Error message:', error.message);
+            next(new UnauthorizedError('Invalid token'));
+        } else {
+            next(error);
         }
-        return res.status(401).json({ message: 'Invalid token' });
     }
+};
+
+// Role-based authorization middleware
+export const requireRole = (roles: string[]) => {
+    return (req: AuthRequest, res: Response, next: NextFunction) => {
+        if (!req.user || !roles.includes(req.user.role)) {
+            return next(new ForbiddenError('Insufficient permissions'));
+        }
+        next();
+    };
 };
