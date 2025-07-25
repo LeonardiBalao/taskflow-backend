@@ -13,7 +13,7 @@ jest.mock('bcryptjs');
 jest.mock('jsonwebtoken');
 
 // 3. MOCK SETUP - Create typed versions of our mocks
-// Replaces the real User model with a fake one Why:
+// Replaces the real User model with a fake one
 // We don't want to hit a real database during tests - it's slow and unreliable
 const mockUser = User as jest.Mocked<typeof User>;
 const mockBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
@@ -36,6 +36,7 @@ describe('Auth Controller', () => {  // Main test suite
 
     describe('register', () => {    // Sub-suite for register function
         it('should register a new user successfully', async () => { // Individual test
+            // 1. ARRANGE - Set up test data
             const userData = {
                 name: 'Test User',
                 email: 'test@example.com',
@@ -50,12 +51,15 @@ describe('Auth Controller', () => {  // Main test suite
                 password: 'hashedPassword'
             };
 
+            // 2. ARRANGE - Set up mock behaviors
             mockUser.findOne = jest.fn().mockResolvedValue(null);
             mockBcrypt.hash = jest.fn().mockResolvedValue('hashedPassword');
             mockUser.create = jest.fn().mockResolvedValue(mockCreatedUser);
 
+            // 3. ACT - Call the function we're testing
             await register(mockReq as Request, mockRes as Response);
 
+            // 4. ASSERT - Check what happened
             expect(mockUser.findOne).toHaveBeenCalledWith({ email: userData.email });
             expect(mockBcrypt.hash).toHaveBeenCalledWith(userData.password, 10);
             expect(mockUser.create).toHaveBeenCalledWith({
