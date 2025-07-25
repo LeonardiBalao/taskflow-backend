@@ -40,7 +40,8 @@ export const updateProfile = async (req: Request, res: Response) => {
 // Deletar o próprio usuário
 export const deleteProfile = async (req: Request, res: Response) => {
     try {
-        await User.findByIdAndDelete((req as any).user.id);
+        const userDeleted = await User.findByIdAndDelete((req as any).user.id);
+        if (!userDeleted) return res.status(404).json({ message: 'User not found' });
         return res.json({ message: 'User deleted' });
     } catch (error) {
         return res.status(500).json({ message: 'Internal server error' });
